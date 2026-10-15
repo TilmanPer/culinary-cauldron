@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"id": "custom_mod",
+	"version": "${version}",
+	"name": "Culinary Cauldron",
+	"description": "Cook custom soups in a vanilla cauldron over a campfire, stir with a Ladle and siphon with a bowl.",
+	"authors": ["You"],
+	"license": "CC0-1.0",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["com.culinarycauldron.CulinaryCauldron"]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
