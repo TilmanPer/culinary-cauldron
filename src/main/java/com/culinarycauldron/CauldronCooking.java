@@ -45,7 +45,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 
 public final class CauldronCooking {
-	public static final int MAX_INGREDIENTS = 4;
+	public static final int MAX_INGREDIENTS = 3;
 
 	/** Persistent per-dimension storage: cauldron position (BlockPos#asLong as string) -> state. */
 	private static final AttachmentType<Map<String, CauldronData>> STATES =
@@ -104,7 +104,7 @@ public final class CauldronCooking {
 				return InteractionResult.PASS;
 			}
 			if (data.ingredients().size() != MAX_INGREDIENTS) {
-				player.sendOverlayMessage(Component.translatable("message.custom_mod.need_four"));
+				player.sendOverlayMessage(Component.translatable("message.custom_mod.need_three"));
 				return InteractionResult.SUCCESS;
 			}
 			for (ItemStack used : data.ingredients()) {
@@ -230,9 +230,12 @@ public final class CauldronCooking {
 			}
 		}
 
+		hunger /= 2;
+		saturation /= 2.0f;
 		ItemStack soup = new ItemStack(ModItems.CUSTOM_SOUP);
 		soup.set(DataComponents.FOOD, new FoodProperties(hunger, saturation, true));
 		List<MobEffectInstance> merged = merge(effects);
+		soup.set(DataComponents.CUSTOM_NAME, Component.literal(soupName(hunger, saturation, merged)));
 		if (!merged.isEmpty()) { // avoid a "No Effects" tooltip line
 			PotionContents contents = PotionContents.EMPTY;
 			for (MobEffectInstance effect : merged) {
@@ -241,6 +244,55 @@ public final class CauldronCooking {
 			soup.set(DataComponents.POTION_CONTENTS, contents);
 		}
 		return soup;
+	}
+
+	private static String soupName(int hunger, float saturation, List<MobEffectInstance> effects) {
+		Map<String, Double> scores = new LinkedHashMap<>();
+		if (hunger > 0) {
+			double foodScore = foodScore(hunger, saturation);
+			if (saturation / hunger > 1.2f) {
+				scores.put("Sustaining", foodScore);
+			} else {
+				scores.put("Hearty", foodScore);
+			}
+		}
+		for (MobEffectInstance effect : effects) {
+			String category = effectCategory(effect);
+			if (category != null) {
+				double effectScore = (effect.getAmplifier() + 1.0) * effect.getDuration() / 20.0 * 3.0;
+				scores.merge(category, effectScore, Double::sum);
+			}
+		}
+
+		String category = "Hearty";
+		double score = hunger;
+		for (Map.Entry<String, Double> entry : scores.entrySet()) {
+			if (entry.getValue() > score) {
+				category = entry.getKey();
+				score = entry.getValue();
+			}
+		}
+
+		String grade = score < 10.0 ? "Thin " : score >= 25.0 ? "Potent " : score >= 15.0 ? "Rich " : "";
+		return grade + category + " Stew";
+	}
+
+	private static double foodScore(int hunger, float saturation) {
+		return hunger + saturation;
+	}
+
+	private static String effectCategory(MobEffectInstance effect) {
+		String id = BuiltInRegistries.MOB_EFFECT.getKey(effect.getEffect().value()).getPath();
+		return switch (id) {
+			case "regeneration", "instant_health", "saturation", "absorption", "health_boost" -> "Mending";
+			case "speed", "haste", "strength", "jump_boost", "resistance", "slow_falling", "dolphins_grace" -> "Brawny";
+			case "night_vision", "invisibility", "glowing", "conduit_power" -> "Luminous";
+			case "luck", "hero_of_the_village" -> "Blessed";
+			case "slowness", "mining_fatigue", "weakness", "blindness", "darkness", "nausea", "hunger" -> "Enfeebling";
+			case "poison", "fatal_poison", "wither", "instant_damage" -> "Toxic";
+			case "levitation", "bad_omen", "unluck" -> "Ethereal";
+			default -> null;
+		};
 	}
 
 	/** One instance per effect type: highest amplifier wins, then longest duration. */

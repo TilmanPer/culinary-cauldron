@@ -11,7 +11,7 @@ import net.minecraft.world.item.ItemStack;
 /**
  * Cooking state of one vanilla cauldron.
  *
- * @param ingredients  up to 4 stored single-item stacks
+	 * @param ingredients  up to 3 stored single-item stacks
  * @param cooked       is_cooked
  * @param pendingSoup  pending_soup_data: the finished soup (hunger, saturation, effects) awaiting a bowl
  * @param soupColor    RGB of the cooked soup (used for the water overlay)
