@@ -427,7 +427,7 @@ public final class CauldronCooking {
 				nearestGlass(rgb), waterTag(pos)));
 	}
 
-	/** Floats each stored ingredient on the water surface, tilted and partly submerged (4 slots). */
+	/** Floats each stored ingredient on the water surface, tilted and partly submerged (3 slots). */
 	private static void refreshDisplay(ServerLevel level, BlockPos pos, List<ItemStack> ingredients) {
 		clearDisplay(level, pos);
 		if (ingredients.isEmpty()) {
@@ -436,11 +436,11 @@ public final class CauldronCooking {
 			setWaterOverlay(level, pos, averageColor(ingredients));
 		}
 		double y = surfaceY(level, pos) - 0.02;
-		double[][] slots = {{-0.17, -0.17}, {0.17, -0.15}, {-0.15, 0.18}, {0.18, 0.16}};
-		double[] yaw = {20, 115, 200, 290};        // spin around vertical axis (degrees)
-		double[] tiltX = {28, -22, 18, -32};       // pitch away from flat
-		double[] tiltZ = {-15, 24, 30, -20};       // roll away from flat
-		double[] bob = {0.00, 0.03, -0.01, 0.02};  // slight height variation
+		double[][] slots = {{-0.18, -0.12}, {0.18, -0.12}, {0.00, 0.18}};
+		double[] yaw = {20, 140, 260};        // spin around vertical axis (degrees)
+		double[] tiltX = {28, -22, 18};       // pitch away from flat
+		double[] tiltZ = {-15, 24, 30};       // roll away from flat
+		double[] bob = {0.00, 0.03, -0.01};  // slight height variation
 		for (int i = 0; i < ingredients.size() && i < slots.length; i++) {
 			String id = BuiltInRegistries.ITEM.getKey(ingredients.get(i).getItem()).toString();
 			// q = Yaw * TiltZ * (lie flat + TiltX); the right-most rotation is applied to the model first
