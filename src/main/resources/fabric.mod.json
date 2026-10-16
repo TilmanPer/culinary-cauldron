@@ -11,6 +11,7 @@
 		"main": ["com.culinarycauldron.CulinaryCauldron"],
 		"client": ["com.culinarycauldron.CulinaryCauldronClient"]
 	},
+	"mixins": ["custom_mod.mixins.json"],
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~26.3",

@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.culinarycauldron.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "client.CampfireSmokeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

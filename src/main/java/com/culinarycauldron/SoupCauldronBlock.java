@@ -52,20 +52,25 @@ public class SoupCauldronBlock extends LayeredCauldronBlock implements EntityBlo
 		boolean heated = (below.is(Blocks.CAMPFIRE) || below.is(Blocks.SOUL_CAMPFIRE))
 				&& below.getValue(CampfireBlock.LIT);
 		double surface = pos.getY() + (6 + state.getValue(LEVEL) * 3) / 16.0;
-		if (soup.data().cooked() && heated && random.nextInt(5) == 0) {
-			int color = soup.data().soupColor();
-			level.addParticle(new DustParticleOptions(color, 0.7f), pos.getX() + 0.35 + random.nextDouble() * 0.3,
-					surface, pos.getZ() + 0.35 + random.nextDouble() * 0.3, 0, 0.03, 0);
-			if (random.nextBoolean()) {
-				level.addParticle(ParticleTypes.BUBBLE, pos.getX() + 0.5, surface, pos.getZ() + 0.5, 0, 0.05, 0);
+		if (heated && (soup.data().cooked() || !soup.data().ingredients().isEmpty()) && random.nextInt(4) == 0) {
+			if (soup.data().cooked()) {
+				int color = soup.data().soupColor();
+				level.addParticle(new DustParticleOptions(color, 0.7f), pos.getX() + 0.25 + random.nextDouble() * 0.5,
+						surface, pos.getZ() + 0.25 + random.nextDouble() * 0.5, 0, 0.03, 0);
 			}
-			if (random.nextInt(4) == 0) {
+			int bubbles = 1 + random.nextInt(2);
+			for (int i = 0; i < bubbles; i++) {
+				double bubbleX = pos.getX() + 0.2 + random.nextDouble() * 0.6;
+				double bubbleZ = pos.getZ() + 0.2 + random.nextDouble() * 0.6;
+				level.addParticle(ParticleTypes.BUBBLE, bubbleX, surface, bubbleZ, 0, 0.04, 0);
+				if (random.nextBoolean()) {
+					level.addParticle(ParticleTypes.BUBBLE_POP, bubbleX, surface, bubbleZ, 0, 0, 0);
+				}
+			}
+			if (soup.data().cooked() && random.nextInt(4) == 0) {
 				level.addParticle(ParticleTypes.CAMPFIRE_COSY_SMOKE, pos.getX() + 0.5, surface,
 						pos.getZ() + 0.5, 0, 0.02, 0);
 			}
-		} else if (!soup.data().ingredients().isEmpty() && random.nextInt(8) == 0) {
-			level.addParticle(ParticleTypes.BUBBLE, pos.getX() + random.nextDouble() * 0.6 + 0.2,
-					surface, pos.getZ() + random.nextDouble() * 0.6 + 0.2, 0, 0.02, 0);
 		}
 	}
 }
