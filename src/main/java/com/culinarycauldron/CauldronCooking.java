@@ -1,16 +1,10 @@
 package com.culinarycauldron;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.mojang.serialization.Codec;
-
-import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -18,7 +12,6 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -47,28 +40,8 @@ import net.minecraft.world.phys.BlockHitResult;
 public final class CauldronCooking {
 	public static final int MAX_INGREDIENTS = 3;
 
-	/** Persistent per-dimension storage: cauldron position (BlockPos#asLong as string) -> state. */
-	private static final AttachmentType<Map<String, CauldronData>> STATES =
-			AttachmentRegistry.<Map<String, CauldronData>>create(
-					Identifier.fromNamespaceAndPath(CulinaryCauldron.MOD_ID, "cauldron_states"),
-					builder -> builder.persistent(Codec.unboundedMap(Codec.STRING, CauldronData.CODEC)));
-
 	public static void init() {
 		UseBlockCallback.EVENT.register(CauldronCooking::onUse);
-
-		// Give ingredients back if the cauldron is broken mid-cook.
-		PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> {
-			if (level instanceof ServerLevel server && state.is(Blocks.WATER_CAULDRON)) {
-				Map<String, CauldronData> map = new HashMap<>(server.getAttachedOrElse(STATES, Map.of()));
-				CauldronData data = map.remove(key(pos));
-				if (data != null) {
-					server.setAttached(STATES, map);
-					clearDisplay(server, pos);
-					clearWaterOverlay(server, pos);
-					data.ingredients().forEach(s -> Block.popResource(server, pos, s.copy()));
-				}
-			}
-		});
 	}
 
 	// ---------------------------------------------------------------- interaction
@@ -95,9 +68,8 @@ public final class CauldronCooking {
 			return InteractionResult.SUCCESS; // client-side prediction (swing); server is authoritative
 		}
 
-		Map<String, CauldronData> map = new HashMap<>(server.getAttachedOrElse(STATES, Map.of()));
-		String key = key(pos);
-		CauldronData data = map.getOrDefault(key, CauldronData.EMPTY);
+		SoupCauldronBlockEntity blockEntity = getBlockEntity(server, pos);
+		CauldronData data = blockEntity == null ? CauldronData.EMPTY : blockEntity.data();
 
 		if (ladle) {
 			if (data.cooked()) {
@@ -113,10 +85,8 @@ public final class CauldronCooking {
 				}
 			}
 			int soupColor = averageColor(data.ingredients());
-			map.put(key, CauldronData.cooked(buildSoup(data.ingredients()), soupColor));
-			server.setAttached(STATES, map);
+			blockEntity.setData(CauldronData.cooked(buildSoup(data.ingredients()), soupColor));
 			clearDisplay(server, pos);
-			setWaterOverlay(server, pos, soupColor);
 			play(server, pos, SoundEvents.BREWING_STAND_BREW);
 			server.sendParticles(ParticleTypes.CLOUD, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5,
 					12, 0.2, 0.1, 0.2, 0.02);
@@ -135,13 +105,6 @@ public final class CauldronCooking {
 			// One soup per water level (3 from a full cauldron); the cauldron stays "cooked" until empty.
 			BlockState state = level.getBlockState(pos);
 			LayeredCauldronBlock.lowerFillLevel(state, level, pos);
-			if (level.getBlockState(pos).is(Blocks.WATER_CAULDRON)) {
-				setWaterOverlay(server, pos, data.soupColor());
-			} else {
-				map.remove(key);
-				server.setAttached(STATES, map);
-				clearWaterOverlay(server, pos);
-			}
 			play(server, pos, SoundEvents.BOTTLE_FILL);
 			return InteractionResult.SUCCESS;
 		}
@@ -154,10 +117,17 @@ public final class CauldronCooking {
 			List<ItemStack> list = data.ingredients();
 			ItemStack back = list.get(list.size() - 1).copy();
 			CauldronData updated = data.withoutLast();
-			map.put(key, updated);
-			server.setAttached(STATES, map);
 			give(player, back);
-			refreshDisplay(server, pos, updated.ingredients());
+			if (updated.ingredients().isEmpty()) {
+				blockEntity.setData(updated);
+				BlockState soupState = level.getBlockState(pos);
+				level.setBlock(pos, Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL,
+						soupState.getValue(LayeredCauldronBlock.LEVEL)), Block.UPDATE_ALL);
+				clearDisplay(server, pos);
+			} else {
+				blockEntity.setData(updated);
+				refreshDisplay(server, pos, updated.ingredients());
+			}
 			play(server, pos, SoundEvents.GENERIC_SPLASH);
 			return InteractionResult.SUCCESS;
 		}
@@ -172,8 +142,16 @@ public final class CauldronCooking {
 		ItemStack single = held.copyWithCount(1);
 		held.consume(1, player);
 		CauldronData updated = data.withIngredient(single);
-		map.put(key, updated);
-		server.setAttached(STATES, map);
+		if (blockEntity == null) {
+			BlockState water = level.getBlockState(pos);
+			level.setBlock(pos, ModBlocks.SOUP_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL,
+					water.getValue(LayeredCauldronBlock.LEVEL)), Block.UPDATE_ALL);
+			blockEntity = getBlockEntity(server, pos);
+		}
+		if (blockEntity == null) {
+			return InteractionResult.PASS;
+		}
+		blockEntity.setData(updated);
 		refreshDisplay(server, pos, updated.ingredients());
 		play(server, pos, SoundEvents.GENERIC_SPLASH);
 		server.sendParticles(ParticleTypes.SPLASH, pos.getX() + 0.5, pos.getY() + 0.9, pos.getZ() + 0.5,
@@ -185,7 +163,7 @@ public final class CauldronCooking {
 
 	/** Water cauldron directly on top of a lit campfire / soul campfire. */
 	private static boolean isCookingSetup(Level level, BlockPos pos) {
-		if (!level.getBlockState(pos).is(Blocks.WATER_CAULDRON)) {
+		if (!isWaterOrSoup(level.getBlockState(pos))) {
 			return false;
 		}
 		BlockState below = level.getBlockState(pos.below());
@@ -331,12 +309,6 @@ public final class CauldronCooking {
 	private static final int DEFAULT_SOUP = 0x835432; // brown
 	private static final int WATER_BLUE = 0x3F76E4;
 
-	/** Dye colours -> matching stained glass block (vanilla cauldron water can't be tinted server-side). */
-	private static final String[] GLASS = {"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
-			"light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"};
-	private static final int[] GLASS_RGB = {0xF9FFFE, 0xF9801D, 0xC74EBD, 0x3AB3DA, 0xFED83D, 0x80C71F, 0xF38BAA, 0x474F52,
-			0x9D9D97, 0x169C9C, 0x8932B8, 0x3C44AA, 0x835432, 0x5E7C16, 0xB02E26, 0x1D1D21};
-
 	private static final Map<String, Integer> FOOD_COLORS = Map.ofEntries(
 			Map.entry("apple", 0xC8312B), Map.entry("golden_apple", 0xF5C842), Map.entry("golden_carrot", 0xE8B030),
 			Map.entry("carrot", 0xED8A1C), Map.entry("potato", 0xC9A15B), Map.entry("baked_potato", 0xB8863B),
@@ -386,55 +358,15 @@ public final class CauldronCooking {
 		return ((r / n) << 16) | ((g / n) << 8) | (b / n);
 	}
 
-	private static String nearestGlass(int rgb) {
-		int best = 12; // brown
-		long bestDist = Long.MAX_VALUE;
-		for (int i = 0; i < GLASS.length; i++) {
-			long dr = ((rgb >> 16) & 255) - ((GLASS_RGB[i] >> 16) & 255);
-			long dg = ((rgb >> 8) & 255) - ((GLASS_RGB[i] >> 8) & 255);
-			long db = (rgb & 255) - (GLASS_RGB[i] & 255);
-			long d = dr * dr + dg * dg + db * db;
-			if (d < bestDist) {
-				bestDist = d;
-				best = i;
-			}
-		}
-		return GLASS[best] + "_stained_glass";
-	}
-
-	private static String waterTag(BlockPos pos) {
-		return "ccw_" + Long.toUnsignedString(pos.asLong());
-	}
-
-	private static double surfaceY(ServerLevel level, BlockPos pos) {
+	private static double surfaceY(Level level, BlockPos pos) {
 		BlockState state = level.getBlockState(pos);
 		int water = state.hasProperty(LayeredCauldronBlock.LEVEL) ? state.getValue(LayeredCauldronBlock.LEVEL) : 1;
 		return pos.getY() + (6 + water * 3) / 16.0;
 	}
 
-	private static void clearWaterOverlay(ServerLevel level, BlockPos pos) {
-		runCommand(level, "kill @e[type=minecraft:block_display,tag=" + waterTag(pos) + "]");
-	}
-
-	/** A thin tinted glass pane lying just above the water surface. */
-	private static void setWaterOverlay(ServerLevel level, BlockPos pos, int rgb) {
-		clearWaterOverlay(level, pos);
-		runCommand(level, String.format(java.util.Locale.ROOT,
-				"summon minecraft:block_display %.3f %.3f %.3f {block_state:{Name:\"minecraft:%s\"},"
-						+ "transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],"
-						+ "scale:[0.75f,0.01f,0.75f],translation:[0f,0f,0f]},Tags:[\"%s\"]}",
-				pos.getX() + 0.125, surfaceY(level, pos) + 0.004, pos.getZ() + 0.125,
-				nearestGlass(rgb), waterTag(pos)));
-	}
-
 	/** Floats each stored ingredient on the water surface, tilted and partly submerged (3 slots). */
 	private static void refreshDisplay(ServerLevel level, BlockPos pos, List<ItemStack> ingredients) {
 		clearDisplay(level, pos);
-		if (ingredients.isEmpty()) {
-			clearWaterOverlay(level, pos);
-		} else {
-			setWaterOverlay(level, pos, averageColor(ingredients));
-		}
 		double y = surfaceY(level, pos) - 0.02;
 		double[][] slots = {{-0.18, -0.12}, {0.18, -0.12}, {0.00, 0.18}};
 		double[] yaw = {20, 140, 260};        // spin around vertical axis (degrees)
@@ -473,8 +405,12 @@ public final class CauldronCooking {
 
 	// ---------------------------------------------------------------- helpers
 
-	private static String key(BlockPos pos) {
-		return Long.toString(pos.asLong());
+	private static boolean isWaterOrSoup(BlockState state) {
+		return state.is(Blocks.WATER_CAULDRON) || state.is(ModBlocks.SOUP_CAULDRON);
+	}
+
+	private static SoupCauldronBlockEntity getBlockEntity(ServerLevel level, BlockPos pos) {
+		return level.getBlockEntity(pos) instanceof SoupCauldronBlockEntity entity ? entity : null;
 	}
 
 	private static void give(Player player, ItemStack stack) {

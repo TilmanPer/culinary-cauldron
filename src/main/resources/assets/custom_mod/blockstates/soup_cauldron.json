@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "cooked=false,level=1": { "model": "custom_mod:block/soup_cauldron_level1" },
+    "cooked=true,level=1": { "model": "custom_mod:block/soup_cauldron_level1" },
+    "cooked=false,level=2": { "model": "custom_mod:block/soup_cauldron_level2" },
+    "cooked=true,level=2": { "model": "custom_mod:block/soup_cauldron_level2" },
+    "cooked=false,level=3": { "model": "custom_mod:block/soup_cauldron_full" },
+    "cooked=true,level=3": { "model": "custom_mod:block/soup_cauldron_full" }
+  }
+}

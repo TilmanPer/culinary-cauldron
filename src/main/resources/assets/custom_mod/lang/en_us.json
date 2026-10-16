@@ -1,4 +1,5 @@
 {
+		"block.custom_mod.soup_cauldron": "Soup Cauldron",
 	"item.custom_mod.ladle": "Ladle",
 	"item.custom_mod.custom_soup": "Custom Soup",
 	"message.custom_mod.need_three": "The pot needs exactly 3 ingredients before you can stir."

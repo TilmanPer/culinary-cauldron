@@ -10,6 +10,7 @@ public class CulinaryCauldron implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ModItems.init();
+		ModBlocks.init();
 		CauldronCooking.init();
 		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FOOD_AND_DRINKS)
 				.register(entries -> entries.accept(ModItems.LADLE));
