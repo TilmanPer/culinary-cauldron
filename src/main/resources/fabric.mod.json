@@ -1,17 +1,17 @@
 {
 	"schemaVersion": 1,
-	"id": "custom_mod",
+	"id": "culinary_cauldron",
 	"version": "${version}",
 	"name": "Culinary Cauldron",
 	"description": "Cook custom soups in a vanilla cauldron over a campfire, stir with a Ladle and siphon with a bowl.",
-	"authors": ["You"],
+	"authors": ["MaSoap"],
 	"license": "CC0-1.0",
 	"environment": "*",
 	"entrypoints": {
 		"main": ["com.culinarycauldron.CulinaryCauldron"],
 		"client": ["com.culinarycauldron.CulinaryCauldronClient"]
 	},
-	"mixins": ["custom_mod.mixins.json"],
+	"mixins": ["CulinaryCauldron.mixins.json"],
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~26.3",
